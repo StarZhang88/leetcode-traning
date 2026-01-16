@@ -16,6 +16,8 @@ Usage:
   python tools/practice.py --new 2 --review 3
   python tools/practice.py --list leetcode_60
   python tools/practice.py --list-catalog  # List all available problem lists
+  python tools/practice.py --problem 2  # Generate folder for problem ID 2
+  python tools/practice.py --problem 2 --list leetcode_60  # Generate from specific list
 """
 
 from __future__ import annotations
@@ -342,6 +344,14 @@ def render_daily_md(picked: Dict[str, List[Dict[str, Any]]]) -> str:
     return "\n".join(lines)
 
 
+def find_problem_in_list(pid: int, db: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Find problem by ID in the problem list"""
+    for p in db.get("problems", []):
+        if int(p.get("id", 0)) == pid:
+            return p
+    return None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Generate daily LeetCode practice plan",
@@ -357,6 +367,12 @@ def main() -> None:
         "--list-catalog",
         action="store_true",
         help="List all available problem list files",
+    )
+    parser.add_argument(
+        "--problem",
+        type=int,
+        default=None,
+        help="Generate folder for specific problem ID",
     )
     parser.add_argument(
         "--new",
@@ -389,6 +405,32 @@ def main() -> None:
     plan = db.get("default_plan", {})
     review_days = plan.get("review_days", [2, 7, 21])
 
+    # If --problem is specified, generate folder for that specific problem
+    if args.problem is not None:
+        pid = args.problem
+        problem = find_problem_in_list(pid, db)
+        
+        if not problem:
+            raise SystemExit(
+                f"Problem ID {pid} not found in list '{args.list}'.\n"
+                f"Use --list <name> to search in a different list."
+            )
+        
+        if existing_problem_dir(pid):
+            print(f"Problem folder already exists: {existing_problem_dir(pid)}")
+            return
+        
+        folder = create_problem_folder(
+            pid=pid,
+            title=problem["title"],
+            difficulty=problem.get("difficulty", "unknown"),
+            tags=problem.get("tags", []),
+            review_days=review_days,
+        )
+        print(f"Created problem folder: {folder}")
+        return
+
+    # Normal daily plan generation
     new_n = args.new if args.new is not None else int(plan.get("new_per_day", 2))
     review_n = args.review if args.review is not None else int(plan.get("review_per_day", 3))
 
